@@ -50,12 +50,18 @@ class _StudyModeScreenState extends State<StudyModeScreen> {
       _isCorrect = true;
       _correctCount++;
     });
+    // Çalışma sayısını artır
+    final service = Provider.of<FlashcardService>(context, listen: false);
+    service.incrementStudyCount();
   }
 
   void _markIncorrect() {
     setState(() {
       _isCorrect = false;
     });
+    // Çalışma sayısını artır
+    final service = Provider.of<FlashcardService>(context, listen: false);
+    service.incrementStudyCount();
   }
 
   @override

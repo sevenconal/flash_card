@@ -6,11 +6,24 @@ import '../models/flashcard.dart';
 
 class FlashcardService with ChangeNotifier {
   List<Flashcard> _flashcards = [];
+  Map<String, int> _studyStats = {
+    'daily': 0,
+    'weekly': 0,
+    'total': 0,
+    'lastStudyDate': 0,
+  };
 
   List<Flashcard> get flashcards => _flashcards;
 
+  // Çalışma istatistikleri getter'ları
+  int get dailyStudyCount => _studyStats['daily'] ?? 0;
+  int get weeklyStudyCount => _studyStats['weekly'] ?? 0;
+  int get totalStudyCount => _studyStats['total'] ?? 0;
+
   FlashcardService() {
     _loadFromStorage();
+    _loadStudyStats();
+    _updateDailyStats();
   }
 
   // Yeni bir flashcard ekleme
@@ -46,6 +59,79 @@ class FlashcardService with ChangeNotifier {
     _flashcards.removeWhere((flashcard) => flashcard.id == id);
     _saveToStorage();
     notifyListeners();
+  }
+
+  // Çalışma sayısını artır
+  void incrementStudyCount() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final lastStudy =
+        DateTime.fromMillisecondsSinceEpoch(_studyStats['lastStudyDate'] ?? 0);
+    final lastStudyDay =
+        DateTime(lastStudy.year, lastStudy.month, lastStudy.day);
+
+    // Toplam sayıyı artır
+    _studyStats['total'] = (_studyStats['total'] ?? 0) + 1;
+
+    // Günlük sayıyı güncelle
+    if (today.isAtSameMomentAs(lastStudyDay)) {
+      _studyStats['daily'] = (_studyStats['daily'] ?? 0) + 1;
+    } else {
+      _studyStats['daily'] = 1;
+    }
+
+    // Haftalık sayıyı güncelle (son 7 gün)
+    final weekAgo = today.subtract(const Duration(days: 7));
+    if (lastStudy.isAfter(weekAgo)) {
+      _studyStats['weekly'] = (_studyStats['weekly'] ?? 0) + 1;
+    } else {
+      _studyStats['weekly'] = 1;
+    }
+
+    _studyStats['lastStudyDate'] = now.millisecondsSinceEpoch;
+    _saveStudyStats();
+    notifyListeners();
+  }
+
+  // Günlük istatistikleri güncelle (gün değiştiğinde)
+  void _updateDailyStats() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final lastStudy =
+        DateTime.fromMillisecondsSinceEpoch(_studyStats['lastStudyDate'] ?? 0);
+    final lastStudyDay =
+        DateTime(lastStudy.year, lastStudy.month, lastStudy.day);
+
+    if (!today.isAtSameMomentAs(lastStudyDay)) {
+      _studyStats['daily'] = 0;
+      _saveStudyStats();
+      notifyListeners();
+    }
+  }
+
+  // Çalışma istatistiklerini yükle
+  Future<void> _loadStudyStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    final daily = prefs.getInt('study_daily') ?? 0;
+    final weekly = prefs.getInt('study_weekly') ?? 0;
+    final total = prefs.getInt('study_total') ?? 0;
+    final lastStudyDate = prefs.getInt('study_last_date') ?? 0;
+
+    _studyStats = {
+      'daily': daily,
+      'weekly': weekly,
+      'total': total,
+      'lastStudyDate': lastStudyDate,
+    };
+  }
+
+  // Çalışma istatistiklerini kaydet
+  Future<void> _saveStudyStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('study_daily', _studyStats['daily'] ?? 0);
+    await prefs.setInt('study_weekly', _studyStats['weekly'] ?? 0);
+    await prefs.setInt('study_total', _studyStats['total'] ?? 0);
+    await prefs.setInt('study_last_date', _studyStats['lastStudyDate'] ?? 0);
   }
 
   // Rastgele ID oluşturma
